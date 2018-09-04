@@ -69,6 +69,18 @@ class Question
     QuestionFollow.followers_for_question_id(@id)
   end
   
+  def most_followed(n)
+    QuestionFollow.most_followed_questions(n)
+  end
+  
+  def likers
+    QuestionLike.likers_for_question_id(@id)
+  end
+  
+  def num_likes
+    QuestionLike.likers_for_question_id(@id)
+  end
+  
 end
 
 # CREATE TABLE users (
@@ -130,6 +142,9 @@ class User
     QuestionFollow.followed_questions_for_user_id(@id)
   end
     
+  def liked_questions
+    QuestionLike.liked_questions_for_user_id(@id)
+  end
 end
 
 # id INTEGER PRIMARY KEY,
@@ -287,7 +302,68 @@ class QuestionFollow
 
 end
 
+class QuestionLike
+  
+  attr_accessor :user_id, :question_id
+  
+  def initialize(options)
+    @id = options['id']
+    @user_id = options['user_id']
+    @question_id = options['question_id']
+  end
+  
+  def self.all
+    data = QuestionsDatabase.instance.execute("SELECT * FROM question_likes")
+    data.map{ |datum| QuestionFollow.new(datum)}
+  end
 
+  
+  def self.likers_for_question_id(question_id)
+    question = QuestionsDatabase.instance.execute(<<-SQL, question_id)
+    SELECT users.*
+    FROM
+      question_likes
+    JOIN
+      users
+    on users.id = question_likes.user_id
+    where question_id = ?
+    SQL
+    
+    question.map{|question| User.new(question)}
+  end
+  
+  def self.num_likes_for_question_id(question_id)
+    question = QuestionsDatabase.instance.execute(<<-SQL, question_id)
+    SELECT users.*, COUNT(*) AS num_likes
+    FROM
+      question_likes
+    JOIN
+      users
+    on users.id = question_likes.user_id
+    where question_id = ?
+    SQL
+    
+    question.map{|question| User.new(question)}
+  end
+  
+  def self.liked_questions_for_user_id(user_id)
+    question = QuestionsDatabase.instance.execute(<<-SQL, user_id)
+    SELECT questions.*
+    FROM
+      users
+    JOIN
+      question_likes
+    on users.id = question_likes.user_id
+    JOIN
+      questions
+    ON questions.id = question_likes.question_id
+    where user_id = ?
+    SQL
+    
+    question.map{|question| Question.new(question)}
+  end 
+  
+end
 
 
   
