@@ -9,7 +9,7 @@ class QuestionsDatabase < SQLite3::Database
     self.type_translation = true
     self.results_as_hash = true
   end
-  
+
 end
 
 # id INTEGER PRIMARY KEY,
@@ -81,6 +81,10 @@ class Question
     QuestionLike.likers_for_question_id(@id)
   end
   
+  def self.most_liked(n)
+    QuestionLike.most_liked_questions(n)
+  end
+  
 end
 
 # CREATE TABLE users (
@@ -90,7 +94,7 @@ end
 
 class User
   attr_accessor :fname, :lname
-  
+  attr_reader :id
   
   def initialize(options)
     @id = options['id']
@@ -145,8 +149,23 @@ class User
   def liked_questions
     QuestionLike.liked_questions_for_user_id(@id)
   end
+  
+  def average_karma
+    QuestionsDatabase.instance.execute(<<-SQL, self.id)
+      SELECT
+        CAST(COUNT(question_likes.id) AS FLOAT) /
+          COUNT(DISTINCT(questions.id)) AS avg_karma
+      FROM
+        questions
+      LEFT OUTER JOIN
+        question_likes
+      ON
+        questions.id = question_likes.question_id
+      WHERE
+        questions.author_id = ?
+    SQL
+  end
 end
-
 # id INTEGER PRIMARY KEY,
 # question_id INTEGER NOT NULL,
 # parent_reply_id INTEGER,
@@ -362,6 +381,25 @@ class QuestionLike
     
     question.map{|question| Question.new(question)}
   end 
+  
+  def self.most_liked_questions(n)
+    question = QuestionsDatabase.instance.execute(<<-SQL, n)
+    SELECT questions.*, COUNT(*) as liked
+    FROM
+      users
+    JOIN
+      question_likes
+    on users.id = question_likes.user_id
+    JOIN
+      questions
+    ON questions.id = question_likes.question_id
+    GROUP BY questions.id
+    ORDER BY liked DESC
+    LIMIT ?
+    SQL
+    
+    question.map{|question| Question.new(question)}
+  end
   
 end
 
